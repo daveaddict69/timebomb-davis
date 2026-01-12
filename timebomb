@@ -9,81 +9,97 @@ local COOLDOWN = 0.1
 
 local lastEscapeTime = 0
 
-local function escapeFromBombHolder(bombPosition)
-    local now = tick()
-    if now - lastEscapeTime < COOLDOWN then
-        return
+local function d(e,f)
+    local g=RaycastParams.new()
+    g.FilterDescendantsInstances={f}
+    g.FilterType=Enum.RaycastFilterType.Blacklist
+    local h=2
+    local i={Vector3.new(h,0,0),Vector3.new(-h,0,0),Vector3.new(0,0,h),Vector3.new(0,0,-h)}
+    for j,k in ipairs(i) do
+        local l=workspace:Raycast(e,k,g)
+        if l and l.Instance and l.Instance.CanCollide then return false,l.Normal end
     end
-    
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
-    
-    local myPosition = humanoidRootPart.Position
-    local awayDirection = (myPosition - bombPosition).Unit
-    
-    if awayDirection.Magnitude < 0.01 then
-        awayDirection = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit
+    return true
+end
+
+local function m(n,o,p)
+    local q={o,o:Cross(Vector3.new(0,1,0)).Unit,-o:Cross(Vector3.new(0,1,0)).Unit,Vector3.new(0,0,1),Vector3.new(1,0,0),Vector3.new(-1,0,0)}
+    for r,s in ipairs(q) do
+        local t=n+(s*ESCAPE_DISTANCE)
+        t=Vector3.new(t.X,n.Y,t.Z)
+        local u,v=d(t,p)
+        if u then return t,s
+        elseif v then
+            local w=v:Cross(Vector3.new(0,1,0)).Unit
+            if w.Magnitude>0 then
+                local x=n+(w*5)
+                x=Vector3.new(x.X,n.Y,x.Z)
+                if d(x,p) then return x,w end
+                local y=-w
+                local z=n+(y*5)
+                z=Vector3.new(z.X,n.Y,z.Z)
+                if d(z,p) then return z,y end
+            end
+        end
     end
-    
-    local newPosition = myPosition + (awayDirection * ESCAPE_DISTANCE)
-    newPosition = Vector3.new(newPosition.X, myPosition.Y, newPosition.Z)
-    
-    humanoidRootPart.CFrame = CFrame.new(newPosition, newPosition + humanoidRootPart.CFrame.LookVector)
-    
-    lastEscapeTime = now
-    
-    local effect = Instance.new("Part")
-    effect.Size = Vector3.new(3, 3, 3)
-    effect.Position = myPosition
-    effect.Anchored = true
-    effect.CanCollide = false
-    effect.Transparency = 0.5
-    effect.BrickColor = BrickColor.new("Bright blue")
-    effect.Material = Enum.Material.Neon
-    effect.Parent = workspace
-    
-    local arrow = Instance.new("Part")
-    arrow.Size = Vector3.new(0.5, 0.5, 2)
-    arrow.Position = myPosition + (awayDirection * 1)
-    arrow.Anchored = true
-    arrow.CanCollide = false
-    arrow.CFrame = CFrame.lookAt(arrow.Position, arrow.Position + awayDirection)
-    arrow.BrickColor = BrickColor.new("Cyan")
-    arrow.Parent = workspace
-    
-    Debris:AddItem(effect, 0.4)
-    Debris:AddItem(arrow, 0.4)
+    return n+Vector3.new(0,5,0),Vector3.new(0,1,0)
+end
+
+local function A(B)
+    local C=tick()
+    if C-lastEscapeTime<COOLDOWN then return end
+    local D=LocalPlayer.Character
+    if not D then return end
+    local E=D:FindFirstChild("HumanoidRootPart")
+    if not E then return end
+    local F=E.Position
+    local G=(F-B).Unit
+    if G.Magnitude<0.01 then G=Vector3.new(math.random()-0.5,0,math.random()-0.5).Unit end
+    local H,I=m(F,G,D)
+    E.CFrame=CFrame.new(H,H+E.CFrame.LookVector)
+    lastEscapeTime=C
+    local J=Instance.new("Part")
+    J.Size=Vector3.new(3,3,3)
+    J.Position=F
+    J.Anchored=true
+    J.CanCollide=false
+    J.Transparency=0.5
+    J.BrickColor=BrickColor.new("Bright blue")
+    J.Material=Enum.Material.Neon
+    J.Parent=workspace
+    local K=Instance.new("Part")
+    K.Size=Vector3.new(0.5,0.5,2)
+    K.Position=F+(I*1)
+    K.Anchored=true
+    K.CanCollide=false
+    K.CFrame=CFrame.lookAt(K.Position,K.Position+I)
+    K.BrickColor=BrickColor.new("Cyan")
+    K.Parent=workspace
+    Debris:AddItem(J,0.4)
+    Debris:AddItem(K,0.4)
 end
 
 RunService.Heartbeat:Connect(function()
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local myRoot = character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
-    
-    local myPosition = myRoot.Position
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local hasBomb = false
-            for _, item in ipairs(player.Character:GetChildren()) do
-                if item:IsA("Tool") and (item.Name:lower():find("bomb") or item.Name:lower():find("explosive")) then
-                    hasBomb = true
+    local L=LocalPlayer.Character
+    if not L then return end
+    local M=L:FindFirstChild("HumanoidRootPart")
+    if not M then return end
+    local N=M.Position
+    for O,P in ipairs(Players:GetPlayers()) do
+        if P~=LocalPlayer and P.Character then
+            local Q=false
+            for R,S in ipairs(P.Character:GetChildren()) do
+                if S:IsA("Tool") and (S.Name:lower():find("bomb") or S.Name:lower():find("explosive")) then
+                    Q=true
                     break
                 end
             end
-            
-            if hasBomb then
-                local bombRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                if bombRoot then
-                    local distance = (myPosition - bombRoot.Position).Magnitude
-                    
-                    if distance <= DETECTION_RADIUS then
-                        escapeFromBombHolder(bombRoot.Position)
+            if Q then
+                local T=P.Character:FindFirstChild("HumanoidRootPart")
+                if T then
+                    local U=(N-T.Position).Magnitude
+                    if U<=DETECTION_RADIUS then
+                        A(T.Position)
                         break
                     end
                 end
@@ -93,6 +109,6 @@ RunService.Heartbeat:Connect(function()
 end)
 
 LocalPlayer.CharacterAdded:Connect(function()
-    lastEscapeTime = 0
+    lastEscapeTime=0
     task.wait(1)
 end)
