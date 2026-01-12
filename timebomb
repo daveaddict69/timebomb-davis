@@ -1,0 +1,98 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+
+local LocalPlayer = Players.LocalPlayer
+local ESCAPE_DISTANCE = 6
+local DETECTION_RADIUS = 15
+local COOLDOWN = 0.1
+
+local lastEscapeTime = 0
+
+local function escapeFromBombHolder(bombPosition)
+    local now = tick()
+    if now - lastEscapeTime < COOLDOWN then
+        return
+    end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    local myPosition = humanoidRootPart.Position
+    local awayDirection = (myPosition - bombPosition).Unit
+    
+    if awayDirection.Magnitude < 0.01 then
+        awayDirection = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit
+    end
+    
+    local newPosition = myPosition + (awayDirection * ESCAPE_DISTANCE)
+    newPosition = Vector3.new(newPosition.X, myPosition.Y, newPosition.Z)
+    
+    humanoidRootPart.CFrame = CFrame.new(newPosition, newPosition + humanoidRootPart.CFrame.LookVector)
+    
+    lastEscapeTime = now
+    
+    local effect = Instance.new("Part")
+    effect.Size = Vector3.new(3, 3, 3)
+    effect.Position = myPosition
+    effect.Anchored = true
+    effect.CanCollide = false
+    effect.Transparency = 0.5
+    effect.BrickColor = BrickColor.new("Bright blue")
+    effect.Material = Enum.Material.Neon
+    effect.Parent = workspace
+    
+    local arrow = Instance.new("Part")
+    arrow.Size = Vector3.new(0.5, 0.5, 2)
+    arrow.Position = myPosition + (awayDirection * 1)
+    arrow.Anchored = true
+    arrow.CanCollide = false
+    arrow.CFrame = CFrame.lookAt(arrow.Position, arrow.Position + awayDirection)
+    arrow.BrickColor = BrickColor.new("Cyan")
+    arrow.Parent = workspace
+    
+    Debris:AddItem(effect, 0.4)
+    Debris:AddItem(arrow, 0.4)
+end
+
+RunService.Heartbeat:Connect(function()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    
+    local myPosition = myRoot.Position
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hasBomb = false
+            for _, item in ipairs(player.Character:GetChildren()) do
+                if item:IsA("Tool") and (item.Name:lower():find("bomb") or item.Name:lower():find("explosive")) then
+                    hasBomb = true
+                    break
+                end
+            end
+            
+            if hasBomb then
+                local bombRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                if bombRoot then
+                    local distance = (myPosition - bombRoot.Position).Magnitude
+                    
+                    if distance <= DETECTION_RADIUS then
+                        escapeFromBombHolder(bombRoot.Position)
+                        break
+                    end
+                end
+            end
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    lastEscapeTime = 0
+    task.wait(1)
+end)
