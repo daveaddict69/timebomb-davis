@@ -1,373 +1,559 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
-local TELEPORT_DISTANCE = 5.5
-local DETECTION_RADIUS = 12.5
-local COOLDOWN = 0.3
-local JUMP_HEIGHT = 8
+local Debris = game:GetService("Debris")
 
-local lastActionTime = 0
-local isTeleporting = false
-local gotoEnemies = true
-local autoDodge = true
+local ESCAPE_DISTANCE = 5.7
+local DETECTION_RADIUS = 13.3
+local COOLDOWN = 0.1
+
+local lastEscapeTime = 0
+local isEnabled = true
 local guiVisible = true
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "davisly"
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+screenGui.Name = "DavislyAutoDodge"
+screenGui.DisplayOrder = 999
+screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 180)
-mainFrame.Position = UDim2.new(0.02, 0, 0.02, 0)
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 320, 0, 360)
+mainFrame.Position = UDim2.new(0, 20, 0, 20)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-mainFrame.BorderSizePixel = 2
-mainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0.2, 0)
+title.Name = "Title"
+title.Size = UDim2.new(0.7, 0, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "DAVISLY V2"
-title.TextColor3 = Color3.fromRGB(0, 200, 255)
+title.Text = "Davisly - Auto Dodge"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 22
-title.Parent = mainFrame
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
 
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -35, 0, 5)
-closeButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.Font = Enum.Font.GothamBold
-closeButton.TextSize = 18
-closeButton.Parent = mainFrame
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Name = "MinimizeBtn"
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -70, 0, 2)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Text = "_"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 18
+minimizeBtn.Parent = titleBar
 
-local openButton = Instance.new("TextButton")
-openButton.Size = UDim2.new(0, 40, 0, 40)
-openButton.Position = UDim2.new(0, 5, 0, 5)
-openButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-openButton.Text = "OPEN"
-openButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-openButton.Font = Enum.Font.GothamBold
-openButton.TextSize = 14
-openButton.Visible = false
-openButton.Parent = screenGui
+local closeBtn = Instance.new("TextButton")
+closeBtn.Name = "CloseBtn"
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 2)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+closeBtn.BorderSizePixel = 0
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+closeBtn.Parent = titleBar
 
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, -20, 0.15, 0)
-status.Position = UDim2.new(0, 10, 0.25, 0)
-status.BackgroundTransparency = 1
-status.Text = "Status: Active"
-status.TextColor3 = Color3.fromRGB(0, 255, 0)
-status.Font =Enum.Font.Gotham
-status.TextSize = 16
-status.Parent = mainFrame
+local contentFrame = Instance.new("Frame")
+contentFrame.Name = "ContentFrame"
+contentFrame.Size = UDim2.new(1, -20, 1, -55)
+contentFrame.Position = UDim2.new(0, 10, 0, 45)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
 
-local gotoFrame = Instance.new("Frame")
-gotoFrame.Size = UDim2.new(1, -20, 0.2, 0)
-gotoFrame.Position = UDim2.new(0, 10, 0.45, 0)
-gotoFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-gotoFrame.BorderSizePixel = 0
-gotoFrame.Parent = mainFrame
+local statusFrame = Instance.new("Frame")
+statusFrame.Name = "StatusFrame"
+statusFrame.Size = UDim2.new(1, 0, 0, 40)
+statusFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+statusFrame.BorderSizePixel = 0
+statusFrame.Parent = contentFrame
 
-local gotoText = Instance.new("TextLabel")
-gotoText.Size = UDim2.new(0.6, 0, 1, 0)
-gotoText.BackgroundTransparency = 1
-gotoText.Text = "Goto Enemies"
-gotoText.TextColor3 = Color3.fromRGB(255, 255, 255)
-gotoText.Font = Enum.Font.Gotham
-gotoText.TextSize = 16
-gotoText.Parent = gotoFrame
+local statusText = Instance.new("TextLabel")
+statusText.Name = "StatusText"
+statusText.Size = UDim2.new(0.5, 0, 1, 0)
+statusText.Position = UDim2.new(0, 10, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = "STATUS:"
+statusText.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusText.Font = Enum.Font.Gotham
+statusText.TextSize = 14
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+statusText.Parent = statusFrame
 
-local gotoSwitch = Instance.new("TextButton")
-gotoSwitch.Size = UDim2.new(0.3, 0, 0.7, 0)
-gotoSwitch.Position = UDim2.new(0.65, 0, 0.15, 0)
-gotoSwitch.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-gotoSwitch.Text = "ON"
-gotoSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
-gotoSwitch.Font = Enum.Font.GothamBold
-gotoSwitch.TextSize = 14
-gotoSwitch.Parent = gotoFrame
+local statusIndicator = Instance.new("TextLabel")
+statusIndicator.Name = "StatusIndicator"
+statusIndicator.Size = UDim2.new(0.4, 0, 0, 20)
+statusIndicator.Position = UDim2.new(0.55, 0, 0.5, -10)
+statusIndicator.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
+statusIndicator.BorderSizePixel = 0
+statusIndicator.Text = "ON"
+statusIndicator.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusIndicator.Font = Enum.Font.GothamBold
+statusIndicator.TextSize = 12
+statusIndicator.Parent = statusFrame
 
-local dodgeFrame = Instance.new("Frame")
-dodgeFrame.Size = UDim2.new(1, -20, 0.2, 0)
-dodgeFrame.Position = UDim2.new(0, 10, 0.7, 0)
-dodgeFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-dodgeFrame.BorderSizePixel = 0
-dodgeFrame.Parent = mainFrame
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "ToggleBtn"
+toggleBtn.Size = UDim2.new(1, 0, 0, 35)
+toggleBtn.Position = UDim2.new(0, 0, 0, 50)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Text = "TOGGLE AUTO DODGE"
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 14
+toggleBtn.Parent = contentFrame
 
-local dodgeText = Instance.new("TextLabel")
-dodgeText.Size = UDim2.new(0.6, 0, 1, 0)
-dodgeText.BackgroundTransparency = 1
-dodgeText.Text = "Auto Dodge"
-dodgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
-dodgeText.Font = Enum.Font.Gotham
-dodgeText.TextSize = 16
-dodgeText.Parent = dodgeFrame
+local settingsLabel = Instance.new("TextLabel")
+settingsLabel.Name = "SettingsLabel"
+settingsLabel.Size = UDim2.new(1, 0, 0, 25)
+settingsLabel.Position = UDim2.new(0, 0, 0, 100)
+settingsLabel.BackgroundTransparency = 1
+settingsLabel.Text = "SETTINGS"
+settingsLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
+settingsLabel.Font = Enum.Font.GothamBold
+settingsLabel.TextSize = 14
+settingsLabel.TextXAlignment = Enum.TextXAlignment.Left
+settingsLabel.Parent = contentFrame
 
-local dodgeSwitch = Instance.new("TextButton")
-dodgeSwitch.Size = UDim2.new(0.3, 0, 0.7, 0)
-dodgeSwitch.Position = UDim2.new(0.65, 0, 0.15, 0)
-dodgeSwitch.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-dodgeSwitch.Text = "ON"
-dodgeSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
-dodgeSwitch.Font = Enum.Font.GothamBold
-dodgeSwitch.TextSize = 14
-dodgeSwitch.Parent = dodgeFrame
+local escapeDistanceFrame = Instance.new("Frame")
+escapeDistanceFrame.Name = "EscapeDistanceFrame"
+escapeDistanceFrame.Size = UDim2.new(1, 0, 0, 60)
+escapeDistanceFrame.Position = UDim2.new(0, 0, 0, 130)
+escapeDistanceFrame.BackgroundTransparency = 1
+escapeDistanceFrame.Parent = contentFrame
 
-closeButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-    openButton.Visible = true
-    guiVisible = false
-end)
+local escapeDistanceLabel = Instance.new("TextLabel")
+escapeDistanceLabel.Name = "EscapeDistanceLabel"
+escapeDistanceLabel.Size = UDim2.new(1, 0, 0, 20)
+escapeDistanceLabel.BackgroundTransparency = 1
+escapeDistanceLabel.Text = "Escape Distance: 5.7"
+escapeDistanceLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+escapeDistanceLabel.Font = Enum.Font.Gotham
+escapeDistanceLabel.TextSize = 12
+escapeDistanceLabel.TextXAlignment = Enum.TextXAlignment.Left
+escapeDistanceLabel.Parent = escapeDistanceFrame
 
-openButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = true
-    openButton.Visible = false
-    guiVisible = true
-end)
+local escapeDistanceSlider = Instance.new("Frame")
+escapeDistanceSlider.Name = "EscapeDistanceSlider"
+escapeDistanceSlider.Size = UDim2.new(1, 0, 0, 20)
+escapeDistanceSlider.Position = UDim2.new(0, 0, 0, 25)
+escapeDistanceSlider.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+escapeDistanceSlider.BorderSizePixel = 0
+escapeDistanceSlider.Parent = escapeDistanceFrame
 
-gotoSwitch.MouseButton1Click:Connect(function()
-    gotoEnemies = not gotoEnemies
-    if gotoEnemies then
-        gotoSwitch.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        gotoSwitch.Text = "ON"
-        status.Text = "Goto: ON"
-    else
-        gotoSwitch.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        gotoSwitch.Text = "OFF"
-        status.Text = "Goto: OFF"
-    end
-end)
+local escapeDistanceFill = Instance.new("Frame")
+escapeDistanceFill.Name = "EscapeDistanceFill"
+escapeDistanceFill.Size = UDim2.new(0.57, 0, 1, 0)
+escapeDistanceFill.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+escapeDistanceFill.BorderSizePixel = 0
+escapeDistanceFill.Parent = escapeDistanceSlider
 
-dodgeSwitch.MouseButton1Click:Connect(function()
-    autoDodge = not autoDodge
-    if autoDodge then
-        dodgeSwitch.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        dodgeSwitch.Text = "ON"
-        status.Text = "Dodge: ON"
-    else
-        dodgeSwitch.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        dodgeSwitch.Text = "OFF"
-        status.Text = "Dodge: OFF"
-    end
-end)
+local escapeDistanceValue = Instance.new("TextButton")
+escapeDistanceValue.Name = "EscapeDistanceValue"
+escapeDistanceValue.Size = UDim2.new(0, 25, 0, 25)
+escapeDistanceValue.Position = UDim2.new(0.57, -12.5, 0.5, -12.5)
+escapeDistanceValue.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+escapeDistanceValue.BorderSizePixel = 2
+escapeDistanceValue.BorderColor3 = Color3.fromRGB(100, 150, 255)
+escapeDistanceValue.Text = ""
+escapeDistanceValue.ZIndex = 2
+escapeDistanceValue.Parent = escapeDistanceSlider
 
-local function findSafePosition(startPos, targetPos)
-    local directions = {
-        Vector3.new(1, 0, 0),   -- Right
-        Vector3.new(-1, 0, 0),  -- Left
-        Vector3.new(0, 0, 1),   -- Forward
-        Vector3.new(0, 0, -1),  -- Backward
-        Vector3.new(0.7, 0, 0.7),   -- Diagonal right forward
-        Vector3.new(-0.7, 0, 0.7),  -- Diagonal left forward
-        Vector3.new(0.7, 0, -0.7),  -- Diagonal right backward
-        Vector3.new(-0.7, 0, -0.7)  -- Diagonal left backward
-    }
-    
-    for i, dir in ipairs(directions) do
-        local checkPos = startPos + (dir * TELEPORT_DISTANCE)
-        checkPos = Vector3.new(checkPos.X, startPos.Y, checkPos.Z)
-        
-        local ray1 = workspace:Raycast(startPos, dir * TELEPORT_DISTANCE)
-        if not ray1 or not ray1.Instance or not ray1.Instance.CanCollide then
-            local ray2 = workspace:Raycast(checkPos + Vector3.new(0, 1, 0), Vector3.new(0, -3, 0))
-            if ray2 and ray2.Instance and ray2.Instance.CanCollide then
-                return checkPos, dir
-            end
-        end
-    end
-    
-    return startPos, Vector3.new(0, 1, 0)
+local detectionRadiusFrame = Instance.new("Frame")
+detectionRadiusFrame.Name = "DetectionRadiusFrame"
+detectionRadiusFrame.Size = UDim2.new(1, 0, 0, 60)
+detectionRadiusFrame.Position = UDim2.new(0, 0, 0, 200)
+detectionRadiusFrame.BackgroundTransparency = 1
+detectionRadiusFrame.Parent = contentFrame
+
+local detectionRadiusLabel = Instance.new("TextLabel")
+detectionRadiusLabel.Name = "DetectionRadiusLabel"
+detectionRadiusLabel.Size = UDim2.new(1, 0, 0, 20)
+detectionRadiusLabel.BackgroundTransparency = 1
+detectionRadiusLabel.Text = "Detection Radius: 13.3"
+detectionRadiusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+detectionRadiusLabel.Font = Enum.Font.Gotham
+detectionRadiusLabel.TextSize = 12
+detectionRadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+detectionRadiusLabel.Parent = detectionRadiusFrame
+
+local detectionRadiusSlider = Instance.new("Frame")
+detectionRadiusSlider.Name = "DetectionRadiusSlider"
+detectionRadiusSlider.Size = UDim2.new(1, 0, 0, 20)
+detectionRadiusSlider.Position = UDim2.new(0, 0, 0, 25)
+detectionRadiusSlider.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+detectionRadiusSlider.BorderSizePixel = 0
+detectionRadiusSlider.Parent = detectionRadiusFrame
+
+local detectionRadiusFill = Instance.new("Frame")
+detectionRadiusFill.Name = "DetectionRadiusFill"
+detectionRadiusFill.Size = UDim2.new(0.665, 0, 1, 0)
+detectionRadiusFill.BackgroundColor3 = Color3.fromRGB(255, 150, 100)
+detectionRadiusFill.BorderSizePixel = 0
+detectionRadiusFill.Parent = detectionRadiusSlider
+
+local detectionRadiusValue = Instance.new("TextButton")
+detectionRadiusValue.Name = "DetectionRadiusValue"
+detectionRadiusValue.Size = UDim2.new(0, 25, 0, 25)
+detectionRadiusValue.Position = UDim2.new(0.665, -12.5, 0.5, -12.5)
+detectionRadiusValue.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+detectionRadiusValue.BorderSizePixel = 2
+detectionRadiusValue.BorderColor3 = Color3.fromRGB(255, 150, 100)
+detectionRadiusValue.Text = ""
+detectionRadiusValue.ZIndex = 2
+detectionRadiusValue.Parent = detectionRadiusSlider
+
+local cooldownFrame = Instance.new("Frame")
+cooldownFrame.Name = "CooldownFrame"
+cooldownFrame.Size = UDim2.new(1, 0, 0, 40)
+cooldownFrame.Position = UDim2.new(0, 0, 0, 270)
+cooldownFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+cooldownFrame.BorderSizePixel = 0
+cooldownFrame.Parent = contentFrame
+
+local cooldownText = Instance.new("TextLabel")
+cooldownText.Name = "CooldownText"
+cooldownText.Size = UDim2.new(1, 0, 1, 0)
+cooldownText.BackgroundTransparency = 1
+cooldownText.Text = "Cooldown: 0.1s"
+cooldownText.TextColor3 = Color3.fromRGB(200, 200, 200)
+cooldownText.Font = Enum.Font.Gotham
+cooldownText.TextSize = 13
+cooldownText.Parent = cooldownFrame
+
+local minimizedBar = Instance.new("Frame")
+minimizedBar.Name = "MinimizedBar"
+minimizedBar.Size = UDim2.new(0, 180, 0, 35)
+minimizedBar.Position = UDim2.new(0, 20, 0, 20)
+minimizedBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+minimizedBar.BorderSizePixel = 0
+minimizedBar.Active = true
+minimizedBar.Draggable = true
+minimizedBar.Visible = false
+minimizedBar.Parent = screenGui
+
+local minimizedTitle = Instance.new("TextLabel")
+minimizedTitle.Name = "MinimizedTitle"
+minimizedTitle.Size = UDim2.new(0.6, 0, 1, 0)
+minimizedTitle.Position = UDim2.new(0, 10, 0, 0)
+minimizedTitle.BackgroundTransparency = 1
+minimizedTitle.Text = "Davisly"
+minimizedTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizedTitle.Font = Enum.Font.GothamBold
+minimizedTitle.TextSize = 14
+minimizedTitle.TextXAlignment = Enum.TextXAlignment.Left
+minimizedTitle.Parent = minimizedBar
+
+local minimizedStatus = Instance.new("TextLabel")
+minimizedStatus.Name = "MinimizedStatus"
+minimizedStatus.Size = UDim2.new(0.3, 0, 1, 0)
+minimizedStatus.Position = UDim2.new(0.65, 0, 0, 0)
+minimizedStatus.BackgroundTransparency = 1
+minimizedStatus.Text = "ON"
+minimizedStatus.TextColor3 = Color3.fromRGB(60, 200, 80)
+minimizedStatus.Font = Enum.Font.GothamBold
+minimizedStatus.TextSize = 12
+minimizedStatus.Parent = minimizedBar
+
+local restoreBtn = Instance.new("TextButton")
+restoreBtn.Name = "RestoreBtn"
+restoreBtn.Size = UDim2.new(0, 30, 0, 30)
+restoreBtn.Position = UDim2.new(1, -35, 0, 2)
+restoreBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+restoreBtn.BorderSizePixel = 0
+restoreBtn.Text = "^"
+restoreBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+restoreBtn.Font = Enum.Font.GothamBold
+restoreBtn.TextSize = 16
+restoreBtn.Parent = minimizedBar
+
+local keybindFrame = Instance.new("Frame")
+keybindFrame.Name = "KeybindFrame"
+keybindFrame.Size = UDim2.new(1, 0, 0, 30)
+keybindFrame.Position = UDim2.new(0, 0, 0, 315)
+keybindFrame.BackgroundTransparency = 1
+keybindFrame.Parent = contentFrame
+
+local keybindLabel = Instance.new("TextLabel")
+keybindLabel.Name = "KeybindLabel"
+keybindLabel.Size = UDim2.new(0.6, 0, 1, 0)
+keybindLabel.BackgroundTransparency = 1
+keybindLabel.Text = "Toggle Keybind: Insert"
+keybindLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+keybindLabel.Font = Enum.Font.Gotham
+keybindLabel.TextSize = 11
+keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
+keybindLabel.Parent = keybindFrame
+
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local function escapeFromBombHolder(bombPosition)
+	if not isEnabled then return end
+	
+	local now = tick()
+	if now - lastEscapeTime < COOLDOWN then
+		return
+	end
+	
+	local character = LocalPlayer.Character
+	if not character then return end
+	
+	local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+	if not humanoidRootPart then return end
+	
+	local myPosition = humanoidRootPart.Position
+	local awayVector = (myPosition - bombPosition)
+	local distanceToBomb = awayVector.Magnitude
+	
+	local awayDirection
+	if distanceToBomb > 0.1 then
+		awayDirection = awayVector.Unit
+	else
+		awayDirection = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit
+	end
+	
+	local newPosition = myPosition + (awayDirection * ESCAPE_DISTANCE)
+	newPosition = Vector3.new(newPosition.X, myPosition.Y, newPosition.Z)
+	
+	humanoidRootPart.CFrame = CFrame.new(newPosition, newPosition + humanoidRootPart.CFrame.LookVector)
+	
+	lastEscapeTime = now
+	
+	local effect = Instance.new("Part")
+	effect.Size = Vector3.new(1, 1, 1)
+	effect.Position = myPosition
+	effect.Anchored = true
+	effect.CanCollide = false
+	effect.Transparency = 0.4
+	effect.BrickColor = BrickColor.new("Bright violet")
+	effect.Material = Enum.Material.Neon
+	effect.Parent = workspace
+	
+	local line = Instance.new("Part")
+	line.Size = Vector3.new(0.2, 0.2, ESCAPE_DISTANCE)
+	line.Position = (myPosition + newPosition) / 2
+	line.Anchored = true
+	line.CanCollide = false
+	line.Transparency = 0.3
+	line.BrickColor = BrickColor.new("Bright blue")
+	line.CFrame = CFrame.lookAt(line.Position, newPosition)
+	line.Parent = workspace
+	
+	local endPoint = Instance.new("Part")
+	endPoint.Size = Vector3.new(1.5, 1.5, 1.5)
+	endPoint.Position = newPosition
+	endPoint.Anchored = true
+	endPoint.CanCollide = false
+	endPoint.Transparency = 0.2
+	endPoint.BrickColor = BrickColor.new("Bright green")
+	endPoint.Material = Enum.Material.Neon
+	endPoint.Parent = workspace
+	
+	Debris:AddItem(effect, 0.5)
+	Debris:AddItem(line, 0.5)
+	Debris:AddItem(endPoint, 0.5)
+	
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://911846307"
+	sound.Volume = 0.6
+	sound.Parent = humanoidRootPart
+	sound:Play()
+	Debris:AddItem(sound, 2)
 end
 
-local function E(F)
-    local G=tick()
-    if G-lastActionTime<COOLDOWN then return end
-    if not gotoEnemies then return end
-    local H=LocalPlayer.Character
-    if not H then return end
-    local I=H:FindFirstChild("HumanoidRootPart")
-    if not I then return end
-    local J=H:FindFirstChild("Humanoid")
-    if not J then return end
-    
-    isTeleporting = true
-    status.Text = "Teleporting..."
-    
-    local K=I.Position
-    local L=(F-K).Unit
-    
-    local M, N = findSafePosition(K, F)
-    
-    if (M - K).Magnitude < 1 then
-        status.Text = "Blocked"
-        isTeleporting = false
-        return
-    end
-    
-    I.CFrame = CFrame.new(M, M + N)
-    
-    task.wait(0.1)
-    if gotoEnemies then
-        J.Jump=true
-    end
-    
-    lastActionTime=G
-    
-    local P=Instance.new("Part")
-    P.Size=Vector3.new(1, 1, 1)
-    P.Position=K
-    P.Anchored=true
-    P.CanCollide=false
-    P.Transparency=0.5
-    P.BrickColor=BrickColor.new("Bright blue")
-    P.Material=Enum.Material.Neon
-    P.Parent=workspace
-    
-    Debris:AddItem(P,0.3)
-    
-    task.wait(0.15)
-    isTeleporting = false
-    if gotoEnemies then
-        status.Text = "Goto: ON"
-    else
-        status.Text = "Goto: OFF"
-    end
+local heartbeatConnection
+local function startDetection()
+	if heartbeatConnection then
+		heartbeatConnection:Disconnect()
+	end
+	
+	heartbeatConnection = RunService.Heartbeat:Connect(function()
+		if not isEnabled then return end
+		
+		local character = LocalPlayer.Character
+		if not character then return end
+		
+		local myRoot = character:FindFirstChild("HumanoidRootPart")
+		if not myRoot then return end
+		
+		local myPosition = myRoot.Position
+		
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character then
+				local hasBomb = false
+				for _, item in ipairs(player.Character:GetChildren()) do
+					if item:IsA("Tool") then
+						local name = item.Name:lower()
+						if name:find("bomb") or name:find("explosive") or name:find("grenade") then
+							hasBomb = true
+							break
+						end
+					end
+				end
+				
+				if hasBomb then
+					local bombRoot = player.Character:FindFirstChild("HumanoidRootPart")
+					if bombRoot then
+						local distance = (myPosition - bombRoot.Position).Magnitude
+						
+						if distance <= DETECTION_RADIUS then
+							escapeFromBombHolder(bombRoot.Position)
+							break
+						end
+					end
+				end
+			end
+		end
+	end)
 end
 
-local function Q()
-    local R=LocalPlayer.Character
-    if not R then return end
-    local S=R:FindFirstChild("HumanoidRootPart")
-    if not S then return end
-    local T=R:FindFirstChild("Humanoid")
-    if not T then return end
-    
-    local jumpPos = S.Position
-    local safePos, dir = findSafePosition(jumpPos, jumpPos)
-    
-    if (safePos - jumpPos).Magnitude > 1 then
-        S.CFrame = CFrame.new(safePos, safePos + dir)
-    end
-    
-    task.wait(0.1)
-    T.Jump=true
-    
-    local V=Instance.new("Part")
-    V.Size=Vector3.new(1.5, 1.5, 1.5)
-    V.Position=jumpPos
-    V.Anchored=true
-    V.CanCollide=false
-    V.Transparency=0.5
-    V.BrickColor=BrickColor.new("Bright yellow")
-    V.Material=Enum.Material.Neon
-    V.Parent=workspace
-    
-    Debris:AddItem(V,0.3)
+local function toggleAutoDodge()
+	isEnabled = not isEnabled
+	
+	if isEnabled then
+		statusIndicator.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
+		statusIndicator.Text = "ON"
+		minimizedStatus.Text = "ON"
+		minimizedStatus.TextColor3 = Color3.fromRGB(60, 200, 80)
+		toggleBtn.Text = "DISABLE AUTO DODGE"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+		startDetection()
+	else
+		statusIndicator.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		statusIndicator.Text = "OFF"
+		minimizedStatus.Text = "OFF"
+		minimizedStatus.TextColor3 = Color3.fromRGB(200, 60, 60)
+		toggleBtn.Text = "ENABLE AUTO DODGE"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
+		if heartbeatConnection then
+			heartbeatConnection:Disconnect()
+			heartbeatConnection = nil
+		end
+	end
 end
 
-local function W()
-    local X=LocalPlayer
-    local Y=X:FindFirstChild("Team")
-    if not Y then return nil end
-    
-    local Z=Y.TeamColor
-    local _={}
-    
-    for a0,a1 in ipairs(Players:GetPlayers()) do
-        if a1~=X and a1.Character then
-            local a2=a1:FindFirstChild("Team")
-            if a2 then
-                if a2.TeamColor~=Z then
-                    table.insert(_,a1)
-                end
-            end
-        end
-    end
-    
-    return _
+local function updateEscapeDistance(value)
+	ESCAPE_DISTANCE = math.floor(value * 100) / 100
+	escapeDistanceLabel.Text = "Escape Distance: " .. tostring(ESCAPE_DISTANCE)
+	local fillSize = ESCAPE_DISTANCE / 10
+	escapeDistanceFill.Size = UDim2.new(fillSize, 0, 1, 0)
+	escapeDistanceValue.Position = UDim2.new(fillSize, -12.5, 0.5, -12.5)
 end
 
-local function a3()
-    if not autoDodge then return end
-    local G=tick()
-    if G-lastActionTime<COOLDOWN then return end
-    
-    local a4=LocalPlayer.Character
-    if not a4 then return end
-    local a5=a4:FindFirstChild("HumanoidRootPart")
-    if not a5 then return end
-    
-    local a6=a5.Position
-    
-    for a7,a8 in ipairs(Players:GetPlayers()) do
-        if a8~=LocalPlayer and a8.Character then
-            local a9=false
-            for aa,ab in ipairs(a8.Character:GetChildren()) do
-                if ab:IsA("Tool") and (ab.Name:lower():find("bomb") or ab.Name:lower():find("explosive")) then
-                    a9=true
-                    break
-                end
-            end
-            
-            if a9 then
-                local ac=a8.Character:FindFirstChild("HumanoidRootPart")
-                if ac then
-                    local ad=(a6-ac.Position).Magnitude
-                    if ad<=DETECTION_RADIUS then
-                        if autoDodge then
-                            Q()
-                        end
-                        lastActionTime=G
-                        break
-                    end
-                end
-            end
-        end
-    end
+local function updateDetectionRadius(value)
+	DETECTION_RADIUS = math.floor(value * 100) / 100
+	detectionRadiusLabel.Text = "Detection Radius: " .. tostring(DETECTION_RADIUS)
+	local fillSize = DETECTION_RADIUS / 20
+	detectionRadiusFill.Size = UDim2.new(fillSize, 0, 1, 0)
+	detectionRadiusValue.Position = UDim2.new(fillSize, -12.5, 0.5, -12.5)
 end
 
-RunService.Heartbeat:Connect(function()
-    local ae=tick()
-    if ae-lastActionTime<COOLDOWN then return end
-    
-    local af=LocalPlayer.Character
-    if not af then return end
-    local ag=af:FindFirstChild("HumanoidRootPart")
-    if not ag then return end
-    
-    local ah=ag.Position
-    
-    if gotoEnemies then
-        local ai=W()
-        if #ai>0 then
-            for aj,ak in ipairs(ai) do
-                if ak.Character then
-                    local al=ak.Character:FindFirstChild("HumanoidRootPart")
-                    if al then
-                        local am=(ah-al.Position).Magnitude
-                        if am<=DETECTION_RADIUS then
-                            E(al.Position)
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    a3()
+local function toggleGUI()
+	guiVisible = not guiVisible
+	
+	if guiVisible then
+		mainFrame.Visible = true
+		minimizedBar.Visible = false
+	else
+		mainFrame.Visible = false
+		minimizedBar.Visible = true
+	end
+end
+
+toggleBtn.MouseButton1Click:Connect(toggleAutoDodge)
+
+minimizeBtn.MouseButton1Click:Connect(toggleGUI)
+restoreBtn.MouseButton1Click:Connect(toggleGUI)
+
+closeBtn.MouseButton1Click:Connect(function()
+	screenGui:Destroy()
+	if heartbeatConnection then
+		heartbeatConnection:Disconnect()
+	end
 end)
+
+local function setupSlider(sliderFrame, valueButton, fillFrame, updateFunction, minValue, maxValue, currentValue)
+	local dragging = false
+	
+	local function updateSlider(input)
+		local relativeX = (input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X
+		local clampedX = math.clamp(relativeX, 0, 1)
+		local value = minValue + (clampedX * (maxValue - minValue))
+		
+		updateFunction(value)
+	end
+	
+	sliderFrame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			updateSlider(input)
+		end
+	end)
+	
+	sliderFrame.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			updateSlider(input)
+		end
+	end)
+	
+	valueButton.MouseButton1Down:Connect(function()
+		dragging = true
+	end)
+	
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+end
+
+setupSlider(escapeDistanceSlider, escapeDistanceValue, escapeDistanceFill, updateEscapeDistance, 1, 10, ESCAPE_DISTANCE)
+setupSlider(detectionRadiusSlider, detectionRadiusValue, detectionRadiusFill, updateDetectionRadius, 5, 20, DETECTION_RADIUS)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if not gameProcessed then
+		if input.KeyCode == Enum.KeyCode.Insert then
+			toggleAutoDodge()
+		elseif input.KeyCode == Enum.KeyCode.Delete then
+			toggleGUI()
+		end
+	end
+end)
+
+startDetection()
+updateEscapeDistance(ESCAPE_DISTANCE)
+updateDetectionRadius(DETECTION_RADIUS)
 
 LocalPlayer.CharacterAdded:Connect(function()
-    lastActionTime=0
-    task.wait(1)
-    if screenGui then
-        screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    end
+	lastEscapeTime = 0
+	task.wait(1)
 end)
+
+print("Davisly Auto Dodge GUI Loaded!")
+print("Press INSERT to toggle auto dodge")
+print("Press DELETE to toggle GUI")
